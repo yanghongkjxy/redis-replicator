@@ -43,6 +43,9 @@ Table of Contents([中文说明](./README.zh_CN.md))
       * [5.6. Avoid full sync](#56-avoid-full-sync)
       * [5.7. Lifecycle event](#57-lifecycle-event)
       * [5.8. Handle huge key value pair](#58-handle-huge-key-value-pair)
+      * [5.9. Redis6 support](#59-redis6-support)
+         * [5.9.1. SSL support](#591-ssl-support)
+         * [5.9.2. ACL support](#592-acl-support)
    * [6. Contributors](#6-contributors)
    * [7. References](#7-references)
    * [8. Supported by](#8-supported-by)
@@ -60,7 +63,7 @@ Table of Contents([中文说明](./README.zh_CN.md))
 [![Hex.pm](https://img.shields.io/hexpm/l/plug.svg?maxAge=2592000)](https://github.com/leonchen83/redis-replicator/blob/master/LICENSE)
 [![LICENSE](https://img.shields.io/badge/license-Anti%20996-blue.svg?style=flat-square)](./ANTI-996-LICENSE)  
   
-Redis Replicator implement Redis Replication protocol written in java. It can parse, filter, broadcast the RDB and AOF events in a real time manner. It also can synchronize redis data to your local cache or to database. The following I mentioned `Command` which means `Writable Command`(e.g. `set`,`hmset`) in Redis and excludes the `Readable Command`(e.g. `get`,`hmget`), Supported redis-5.0 and former redis versions.  
+Redis Replicator implement Redis Replication protocol written in java. It can parse, filter, broadcast the RDB and AOF events in a real time manner. It also can synchronize redis data to your local cache or to database. The following I mentioned `Command` which means `Writable Command`(e.g. `set`,`hmset`) in Redis and excludes the `Readable Command`(e.g. `get`,`hmget`), Supported redis-6.0 and former redis versions.  
 
 ## 1.2. Chat with author  
   
@@ -74,14 +77,14 @@ Redis Replicator implement Redis Replication protocol written in java. It can pa
 ## 2.1. Requirements  
 jdk 1.8+  
 maven-3.3.1+(support [toolchains](https://maven.apache.org/guides/mini/guide-using-toolchains.html))  
-redis 2.6 - 5.0  
+redis 2.6 - 6.0  
 
 ## 2.2. Maven dependency  
 ```xml  
     <dependency>
         <groupId>com.moilioncircle</groupId>
         <artifactId>redis-replicator</artifactId>
-        <version>3.3.3</version>
+        <version>3.4.1</version>
     </dependency>
 ```
 
@@ -100,7 +103,8 @@ redis 2.6 - 5.0
 
 |     **redis version**        |**redis-replicator version**  |  
 | ---------------------------- | ---------------------------- |  
-|  \[2.6, 5.0.x\]              |       \[2.6.1, \]            |  
+|  \[2.6, 6.0.x\]              |       \[3.4.0, \]            |  
+|  \[2.6, 5.0.x\]              |       \[2.6.1, 3.3.3\]       |  
 |  \[2.6, 4.0.x\]              |       \[2.3.0, 2.5.0\]       |  
 |  \[2.6, 4.0-RC3\]            |       \[2.1.0, 2.2.0\]       |  
 |  \[2.6, 3.2.x\]              |  \[1.0.18\](not supported)   |  
@@ -396,6 +400,7 @@ Replicator replicator = new RedisReplicator("redis:///path/to/appendonly.aof");
 // configuration setting example
 Replicator replicator = new RedisReplicator("redis://127.0.0.1:6379?authPassword=foobared&readTimeout=10000&ssl=yes");
 Replicator replicator = new RedisReplicator("redis:///path/to/dump.rdb?rateLimit=1000000");
+Replicator replicator = new RedisReplicator("rediss://user:pass@127.0.0.1:6379?rateLimit=1000000");
 ```
 
 # 5. Other topics  
@@ -448,22 +453,33 @@ Replicator replicator = new RedisReplicator("redis:///path/to/dump.rdb?rateLimit
 ## 5.4. SSL connection  
   
 ```java  
+    System.setProperty("javax.net.ssl.keyStore", "/path/to/keystore");
+    System.setProperty("javax.net.ssl.keyStorePassword", "password");
+    System.setProperty("javax.net.ssl.keyStoreType", "your_type");
+
     System.setProperty("javax.net.ssl.trustStore", "/path/to/truststore");
     System.setProperty("javax.net.ssl.trustStorePassword", "password");
     System.setProperty("javax.net.ssl.trustStoreType", "your_type");
+
     Configuration.defaultSetting().setSsl(true);
-    //optional setting
+
+    // optional setting
     Configuration.defaultSetting().setSslSocketFactory(sslSocketFactory);
     Configuration.defaultSetting().setSslParameters(sslParameters);
     Configuration.defaultSetting().setHostnameVerifier(hostnameVerifier);
+    // redis uri
+    "redis://127.0.0.1:6379?ssl=yes"
+    "rediss://127.0.0.1:6379"
 ```
   
 ## 5.5. Auth  
   
 ```java  
+    Configuration.defaultSetting().setAuthUser("default");
     Configuration.defaultSetting().setAuthPassword("foobared");
     // redis uri
-    "redis://127.0.0.1:6379?authPassword=foobared"
+    "redis://127.0.0.1:6379?authPassword=foobared&authUser=default"
+    "redis://default:foobared@127.0.0.1:6379"
 ```  
 
 ## 5.6. Avoid full sync  
@@ -507,6 +523,58 @@ More details please refer to:
 [1] [HugeKVFileExample.java](./examples/com/moilioncircle/examples/huge/HugeKVFileExample.java)  
 [2] [HugeKVSocketExample.java](./examples/com/moilioncircle/examples/huge/HugeKVSocketExample.java)  
   
+## 5.9. Redis6 support
+
+### 5.9.1. SSL support
+
+```
+    $cd /path/to/redis
+    $./utils/gen-test-certs.sh
+    $cd tests/tls
+    $openssl pkcs12 -export -CAfile ca.crt -in redis.crt -inkey redis.key -out redis.p12
+    $cd /path/to/redis
+    $./src/redis-server --tls-port 6379 --port 0 --tls-cert-file ./tests/tls/redis.crt \
+         --tls-key-file ./tests/tls/redis.key --tls-ca-cert-file ./tests/tls/ca.crt \
+         --tls-replication yes --bind 0.0.0.0 --protected-mode no
+
+    System.setProperty("javax.net.ssl.keyStore", "/path/to/redis/tests/tls/redis.p12");
+    System.setProperty("javax.net.ssl.keyStorePassword", "password");
+    System.setProperty("javax.net.ssl.keyStoreType", "pkcs12");
+
+    System.setProperty("javax.net.ssl.trustStore", "/path/to/redis/tests/tls/redis.p12");
+    System.setProperty("javax.net.ssl.trustStorePassword", "password");
+    System.setProperty("javax.net.ssl.trustStoreType", "pkcs12");
+
+    Replicator replicator = new RedisReplicator("rediss://127.0.0.1:6379");
+
+```
+  
+If you don't want to use `System.setProperty` you can programing as following  
+  
+```java  
+
+    RedisSslContextFactory factory = new RedisSslContextFactory();
+    factory.setKeyStorePath("/path/to/redis/tests/tls/redis.p12");
+    factory.setKeyStoreType("pkcs12");
+    factory.setKeyStorePassword("password");
+
+    factory.setTrustStorePath("/path/to/redis/tests/tls/redis.p12");
+    factory.setTrustStoreType("pkcs12");
+    factory.setTrustStorePassword("password");
+
+    SslConfiguration ssl = SslConfiguration.defaultSetting().setSslContextFactory(factory);
+    Replicator replicator = new RedisReplicator("rediss://127.0.0.1:6379", ssl);
+
+``` 
+
+### 5.9.2. ACL support
+
+```java  
+
+    Replicator replicator = new RedisReplicator("redis://user:pass@127.0.0.1:6379");
+
+```
+
 # 6. Contributors  
 * [Leon Chen](https://github.com/leonchen83)  
 * [Adrian Yao](https://github.com/adrianyao89)  

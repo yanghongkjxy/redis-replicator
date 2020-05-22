@@ -1,3 +1,12 @@
+### 3.4.1
+
+Mask auth password.  
+
+### 3.4.0
+
+Redis6 SSL, ACL support.  
+`SetCommand` add keepttl parameter.  
+
 ### 3.3.3
 Parse `PING` command.  
 

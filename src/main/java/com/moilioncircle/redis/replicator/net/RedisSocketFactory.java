@@ -16,15 +16,17 @@
 
 package com.moilioncircle.redis.replicator.net;
 
-import com.moilioncircle.redis.replicator.Configuration;
-
-import javax.net.SocketFactory;
-import javax.net.ssl.SSLSocket;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.net.SocketException;
+
+import javax.net.SocketFactory;
+import javax.net.ssl.SSLSocket;
+import javax.net.ssl.SSLSocketFactory;
+
+import com.moilioncircle.redis.replicator.Configuration;
 
 /**
  * @author Leon Chen
@@ -41,7 +43,7 @@ public class RedisSocketFactory extends SocketFactory {
     @Override
     public Socket createSocket(String host, int port) throws IOException {
         if (configuration.isSsl()) {
-            return buildSsl(build(configuration.getSslSocketFactory().createSocket(host, port)), host);
+            return buildSsl(build(buildSslSocketFactory().createSocket(host, port)), host);
         } else {
             return build(new Socket(host, port));
         }
@@ -50,7 +52,7 @@ public class RedisSocketFactory extends SocketFactory {
     @Override
     public Socket createSocket(String host, int port, InetAddress localAddr, int localPort) throws IOException {
         if (configuration.isSsl()) {
-            return buildSsl(build(configuration.getSslSocketFactory().createSocket(host, port, localAddr, localPort)), host);
+            return buildSsl(build(buildSslSocketFactory().createSocket(host, port, localAddr, localPort)), host);
         } else {
             return build(new Socket(host, port, localAddr, localPort));
         }
@@ -59,7 +61,7 @@ public class RedisSocketFactory extends SocketFactory {
     @Override
     public Socket createSocket(InetAddress address, int port) throws IOException {
         if (configuration.isSsl()) {
-            return buildSsl(build(configuration.getSslSocketFactory().createSocket(address, port)), address.getHostAddress());
+            return buildSsl(build(buildSslSocketFactory().createSocket(address, port)), address.getHostAddress());
         } else {
             return build(new Socket(address, port));
         }
@@ -68,7 +70,7 @@ public class RedisSocketFactory extends SocketFactory {
     @Override
     public Socket createSocket(InetAddress address, int port, InetAddress localAddr, int localPort) throws IOException {
         if (configuration.isSsl()) {
-            return buildSsl(build(configuration.getSslSocketFactory().createSocket(address, port, localAddr, localPort)), address.getHostAddress());
+            return buildSsl(build(buildSslSocketFactory().createSocket(address, port, localAddr, localPort)), address.getHostAddress());
         } else {
             return build(new Socket(address, port, localAddr, localPort));
         }
@@ -79,7 +81,7 @@ public class RedisSocketFactory extends SocketFactory {
         build(socket);
         socket.connect(new InetSocketAddress(host, port), timeout);
         if (configuration.isSsl()) {
-            socket = configuration.getSslSocketFactory().createSocket(socket, host, port, true);
+            socket = buildSslSocketFactory().createSocket(socket, host, port, true);
             return buildSsl(socket, host);
         } else {
             return socket;
@@ -111,5 +113,15 @@ public class RedisSocketFactory extends SocketFactory {
             throw new SocketException("the connection to " + host + " failed ssl/tls hostname verification.");
         }
         return socket;
+    }
+    
+    private SSLSocketFactory buildSslSocketFactory() {
+        SSLSocketFactory factory;
+        if (configuration.getSslContextFactory() != null) {
+            factory = configuration.getSslContextFactory().create().getSocketFactory();
+        } else {
+            factory = configuration.getSslSocketFactory();
+        }
+        return factory;
     }
 }

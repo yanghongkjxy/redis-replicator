@@ -16,11 +16,15 @@
 
 package com.moilioncircle.redis.replicator;
 
+import java.util.Map;
+import java.util.concurrent.atomic.AtomicLong;
+
 import javax.net.ssl.HostnameVerifier;
 import javax.net.ssl.SSLParameters;
 import javax.net.ssl.SSLSocketFactory;
-import java.util.Map;
-import java.util.concurrent.atomic.AtomicLong;
+
+import com.moilioncircle.redis.replicator.net.SslContextFactory;
+import com.moilioncircle.redis.replicator.util.Strings;
 
 /**
  * @author Leon Chen
@@ -74,6 +78,13 @@ public class Configuration {
      * redis input stream buffer size
      */
     private int bufferSize = 8 * 1024;
+    
+    /**
+     * auth user (redis 6.0)
+     * 
+     * @since 3.4.0
+     */
+    private String authUser = null;
 
     /**
      * auth password
@@ -123,6 +134,13 @@ public class Configuration {
      * ssl socket factory
      */
     private SSLSocketFactory sslSocketFactory = (SSLSocketFactory) SSLSocketFactory.getDefault();
+    
+    /**
+     * ssl context factory
+     * 
+     * @since 3.4.0
+     */
+    private SslContextFactory sslContextFactory;
 
     /**
      * ssl parameters
@@ -173,6 +191,15 @@ public class Configuration {
 
     public Configuration setRetries(int retries) {
         this.retries = retries;
+        return this;
+    }
+
+    public String getAuthUser() {
+        return authUser;
+    }
+
+    public Configuration setAuthUser(String authUser) {
+        this.authUser = authUser;
         return this;
     }
 
@@ -325,6 +352,15 @@ public class Configuration {
         return this;
     }
 
+    public SslContextFactory getSslContextFactory() {
+        return sslContextFactory;
+    }
+
+    public Configuration setSslContextFactory(SslContextFactory sslContextFactory) {
+        this.sslContextFactory = sslContextFactory;
+        return this;
+    }
+
     public SSLParameters getSslParameters() {
         return sslParameters;
     }
@@ -340,6 +376,15 @@ public class Configuration {
 
     public Configuration setHostnameVerifier(HostnameVerifier hostnameVerifier) {
         this.hostnameVerifier = hostnameVerifier;
+        return this;
+    }
+    
+    public Configuration merge(SslConfiguration sslConfiguration) {
+        if (sslConfiguration == null) return this;
+        this.setSslParameters(sslConfiguration.getSslParameters());
+        this.setSslSocketFactory(sslConfiguration.getSslSocketFactory());
+        this.setHostnameVerifier(sslConfiguration.getHostnameVerifier());
+        this.setSslContextFactory(sslConfiguration.getSslContextFactory());
         return this;
     }
 
@@ -366,6 +411,9 @@ public class Configuration {
         }
         if (parameters.containsKey("bufferSize")) {
             configuration.setBufferSize(getInt(parameters.get("bufferSize"), 8 * 1024));
+        }
+        if (parameters.containsKey("authUser")) {
+            configuration.setAuthPassword(parameters.get("authUser"));
         }
         if (parameters.containsKey("authPassword")) {
             configuration.setAuthPassword(parameters.get("authPassword"));
@@ -399,6 +447,16 @@ public class Configuration {
         }
         if (parameters.containsKey("replOffset")) {
             configuration.setReplOffset(getLong(parameters.get("replOffset"), -1L));
+        }
+        // redis 6
+        if (uri.isSsl()) {
+            configuration.setSsl(true);
+        }
+        if (uri.getUser() != null) {
+            configuration.setAuthUser(uri.getUser());
+        }
+        if (uri.getPassword() != null) {
+            configuration.setAuthPassword(uri.getPassword());
         }
         return configuration;
     }
@@ -443,7 +501,8 @@ public class Configuration {
                 ", retries=" + retries +
                 ", retryTimeInterval=" + retryTimeInterval +
                 ", bufferSize=" + bufferSize +
-                ", authPassword='" + authPassword + '\'' +
+                ", authUser='" + authUser + '\'' +
+                ", authPassword='" + Strings.mask(authPassword) + '\'' +
                 ", discardRdbEvent=" + discardRdbEvent +
                 ", asyncCachedBytes=" + asyncCachedBytes +
                 ", rateLimit=" + rateLimit +
@@ -452,6 +511,7 @@ public class Configuration {
                 ", useDefaultExceptionListener=" + useDefaultExceptionListener +
                 ", ssl=" + ssl +
                 ", sslSocketFactory=" + sslSocketFactory +
+                ", sslContextFactory=" + sslContextFactory +
                 ", sslParameters=" + sslParameters +
                 ", hostnameVerifier=" + hostnameVerifier +
                 ", replId='" + replId + '\'' +

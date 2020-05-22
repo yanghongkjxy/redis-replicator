@@ -44,6 +44,9 @@
       * [5.6. 避免全量同步](#56-避免全量同步)
       * [5.7. 生命周期事件](#57-生命周期事件)
       * [5.8. 处理巨大的KV](#58-处理巨大的kv)
+      * [5.9. Redis6支持](#59-redis6支持)
+         * [5.9.1. SSL支持](#591-ssl支持)
+         * [5.9.2. ACL支持](#592-acl支持)
    * [6. 贡献者](#6-贡献者)
    * [7. 相关引用](#7-相关引用)
    * [8. 致谢](#8-致谢)
@@ -61,7 +64,7 @@
 [![Hex.pm](https://img.shields.io/hexpm/l/plug.svg?maxAge=2592000)](https://github.com/leonchen83/redis-replicator/blob/master/LICENSE)
 [![LICENSE](https://img.shields.io/badge/license-Anti%20996-blue.svg?style=flat-square)](./ANTI-996-LICENSE_CN)  
   
-Redis Replicator是一款RDB解析以及AOF解析的工具. 此工具完整实现了Redis Replication协议. 支持SYNC, PSYNC, PSYNC2等三种同步命令. 还支持远程RDB文件备份以及数据同步等功能. 此文中提到的 `命令` 特指Redis中的写(比如 `set`,`hmset`)命令，不包括读命令(比如 `get`,`hmget`), 支持的redis版本范围从2.6到5.0  
+Redis Replicator是一款RDB解析以及AOF解析的工具. 此工具完整实现了Redis Replication协议. 支持SYNC, PSYNC, PSYNC2等三种同步命令. 还支持远程RDB文件备份以及数据同步等功能. 此文中提到的 `命令` 特指Redis中的写(比如 `set`,`hmset`)命令，不包括读命令(比如 `get`,`hmget`), 支持的redis版本范围从2.6到6.0  
 
 ## 1.2. QQ讨论组  
   
@@ -80,14 +83,14 @@ Redis Replicator是一款RDB解析以及AOF解析的工具. 此工具完整实�
 ## 2.1. 安装前置条件  
 jdk 1.8+  
 maven-3.3.1+(支持 [toolchains](https://maven.apache.org/guides/mini/guide-using-toolchains.html))  
-redis 2.6 - 5.0  
+redis 2.6 - 6.0  
 
 ## 2.2. Maven依赖  
 ```xml  
     <dependency>
         <groupId>com.moilioncircle</groupId>
         <artifactId>redis-replicator</artifactId>
-        <version>3.3.3</version>
+        <version>3.4.1</version>
     </dependency>
 ```
 
@@ -106,7 +109,8 @@ redis 2.6 - 5.0
 
 |     **redis 版本**        |**redis-replicator 版本**  |  
 | ------------------------- | ------------------------- |  
-|  \[2.6, 5.0.x\]           |       \[2.6.1, \]         |  
+|  \[2.6, 6.0.x\]           |       \[3.4.0, \]         |  
+|  \[2.6, 5.0.x\]           |       \[2.6.1, 3.3.3\]    |  
 |  \[2.6, 4.0.x\]           |       \[2.3.0, 2.5.0\]    |  
 |  \[2.6, 4.0-RC3\]         |       \[2.1.0, 2.2.0\]    |  
 |  \[2.6, 3.2.x\]           |  \[1.0.18\](不再提供支持)   |  
@@ -403,6 +407,7 @@ Replicator replicator = new RedisReplicator("redis:///path/to/appendonly.aof");
 // 配置的例子
 Replicator replicator = new RedisReplicator("redis://127.0.0.1:6379?authPassword=foobared&readTimeout=10000&ssl=yes");
 Replicator replicator = new RedisReplicator("redis:///path/to/dump.rdb?rateLimit=1000000");
+Replicator replicator = new RedisReplicator("rediss://user:pass@127.0.0.1:6379?rateLimit=1000000");
 ```
 
 
@@ -456,22 +461,33 @@ Replicator replicator = new RedisReplicator("redis:///path/to/dump.rdb?rateLimit
 ## 5.4. SSL安全链接  
   
 ```java  
+    System.setProperty("javax.net.ssl.keyStore", "/path/to/keystore");
+    System.setProperty("javax.net.ssl.keyStorePassword", "password");
+    System.setProperty("javax.net.ssl.keyStoreType", "your_type");
+
     System.setProperty("javax.net.ssl.trustStore", "/path/to/truststore");
     System.setProperty("javax.net.ssl.trustStorePassword", "password");
     System.setProperty("javax.net.ssl.trustStoreType", "your_type");
+
     Configuration.defaultSetting().setSsl(true);
-    //可选设置
+
+    // 可选设置
     Configuration.defaultSetting().setSslSocketFactory(sslSocketFactory);
     Configuration.defaultSetting().setSslParameters(sslParameters);
     Configuration.defaultSetting().setHostnameVerifier(hostnameVerifier);
+    // redis uri
+    "redis://127.0.0.1:6379?ssl=yes"
+    "rediss://127.0.0.1:6379"
 ```
   
 ## 5.5. redis认证  
   
 ```java  
+    Configuration.defaultSetting().setAuthUser("default");
     Configuration.defaultSetting().setAuthPassword("foobared");
     // redis uri
-    "redis://127.0.0.1:6379?authPassword=foobared"
+    "redis://127.0.0.1:6379?authPassword=foobared&authUser=default"
+    "redis://default:foobared@127.0.0.1:6379"
 ```  
 
 ## 5.6. 避免全量同步  
@@ -515,6 +531,58 @@ Replicator replicator = new RedisReplicator("redis:///path/to/dump.rdb?rateLimit
 [1] [HugeKVFileExample.java](./examples/com/moilioncircle/examples/huge/HugeKVFileExample.java)  
 [2] [HugeKVSocketExample.java](./examples/com/moilioncircle/examples/huge/HugeKVSocketExample.java)  
   
+## 5.9. Redis6支持
+
+### 5.9.1. SSL支持
+
+```
+    $cd /path/to/redis
+    $./utils/gen-test-certs.sh
+    $cd tests/tls
+    $openssl pkcs12 -export -CAfile ca.crt -in redis.crt -inkey redis.key -out redis.p12
+    $cd /path/to/redis
+    $./src/redis-server --tls-port 6379 --port 0 --tls-cert-file ./tests/tls/redis.crt \
+         --tls-key-file ./tests/tls/redis.key --tls-ca-cert-file ./tests/tls/ca.crt \
+         --tls-replication yes --bind 0.0.0.0 --protected-mode no
+
+    System.setProperty("javax.net.ssl.keyStore", "/path/to/redis/tests/tls/redis.p12");
+    System.setProperty("javax.net.ssl.keyStorePassword", "password");
+    System.setProperty("javax.net.ssl.keyStoreType", "pkcs12");
+
+    System.setProperty("javax.net.ssl.trustStore", "/path/to/redis/tests/tls/redis.p12");
+    System.setProperty("javax.net.ssl.trustStorePassword", "password");
+    System.setProperty("javax.net.ssl.trustStoreType", "pkcs12");
+
+    Replicator replicator = new RedisReplicator("rediss://127.0.0.1:6379");
+
+```
+  
+如果你不想设置 `System.setProperty` 可以使用下面的方式  
+  
+```java  
+
+    RedisSslContextFactory factory = new RedisSslContextFactory();
+    factory.setKeyStorePath("/path/to/redis/tests/tls/redis.p12");
+    factory.setKeyStoreType("pkcs12");
+    factory.setKeyStorePassword("password");
+
+    factory.setTrustStorePath("/path/to/redis/tests/tls/redis.p12");
+    factory.setTrustStoreType("pkcs12");
+    factory.setTrustStorePassword("password");
+
+    SslConfiguration ssl = SslConfiguration.defaultSetting().setSslContextFactory(factory);
+    Replicator replicator = new RedisReplicator("rediss://127.0.0.1:6379", ssl);
+
+``` 
+
+### 5.9.2. ACL支持
+
+```java  
+
+    Replicator replicator = new RedisReplicator("redis://user:pass@127.0.0.1:6379");
+
+```
+
 # 6. 贡献者  
 
 * [Leon Chen](https://github.com/leonchen83)  
